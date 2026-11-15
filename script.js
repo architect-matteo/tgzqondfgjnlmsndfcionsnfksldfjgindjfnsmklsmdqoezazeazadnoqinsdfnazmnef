@@ -39,6 +39,78 @@ function parseResultsNumber(value) {
   return parseFloat(String(value).replace(',', '.'));
 }
 
+
+function showDetailsOverlay(titleText, detailRows, extraContent) {
+  var overlay = document.createElement('div');
+  overlay.className = 'event-details-overlay';
+  overlay.tabIndex = -1;
+
+  var panel = document.createElement('div');
+  panel.className = 'event-details-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-label', titleText || 'Details');
+
+  var closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'event-details-close';
+  closeButton.setAttribute('aria-label', 'Sluiten');
+  closeButton.textContent = '\u00d7';
+  panel.appendChild(closeButton);
+
+  var title = document.createElement('div');
+  title.className = 'event-details-title';
+  title.textContent = titleText || '';
+  panel.appendChild(title);
+
+  (detailRows || []).forEach(function (detail) {
+    if (!detail || detail.value === undefined || detail.value === null || detail.value === '') return;
+
+    var row = document.createElement('div');
+    row.className = 'event-details-row';
+
+    var label = document.createElement('span');
+    label.className = 'event-details-label';
+    label.textContent = detail.label || '';
+    row.appendChild(label);
+
+    var value = document.createElement('span');
+    value.className = 'event-details-value';
+    value.textContent = String(detail.value);
+    row.appendChild(value);
+
+    panel.appendChild(row);
+  });
+
+  if (extraContent) panel.appendChild(extraContent);
+
+  var note = document.createElement('div');
+  note.className = 'event-details-note';
+  note.textContent = 'Klik buiten het venster of op \u00d7 om te sluiten.';
+  panel.appendChild(note);
+
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+
+  function closeDetails() {
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    document.removeEventListener('keydown', handleKeydown);
+  }
+
+  function handleKeydown(event) {
+    if (event.key === 'Escape') closeDetails();
+  }
+
+  closeButton.addEventListener('click', closeDetails);
+  overlay.addEventListener('click', function (event) {
+    if (event.target === overlay) closeDetails();
+  });
+  document.addEventListener('keydown', handleKeydown);
+  closeButton.focus();
+
+  return overlay;
+}
+
 // Load results from a public JSON file, with a click-to-expand breakdown per course.
 function loadResultsList(jsonUrl, containerId) {
   var container = document.getElementById(containerId);
