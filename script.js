@@ -234,7 +234,7 @@ function loadResultsList(jsonUrl, containerId) {
           if (!isNaN(score)) card.appendChild(buildGradeBar(score));
 
           var components = row.partials || [];
-          if (components.length > 0 || row.professor || row.description) {
+          if (components.length > 0) {
             card.classList.add('has-breakdown');
             card.tabIndex = 0;
             card.setAttribute('role', 'button');
@@ -280,14 +280,11 @@ function loadResultsList(jsonUrl, containerId) {
                 }
               });
 
+              var period = [row.semester, row.year].filter(Boolean).join(' ');
               var detailRows = [
                 { label: 'Eindscore', value: isNaN(score) ? '' : row.score + ' / 20' },
-                { label: 'Jaar', value: row.year },
-                { label: 'Programma', value: row.program },
-                { label: 'Semester', value: row.semester },
-                { label: 'ECTS', value: row.ects ? row.ects + ' studiepunten' : '' },
-                { label: 'Professor', value: row.professor },
-                { label: 'Beschrijving', value: row.description }
+                { label: 'Periode', value: period },
+                { label: 'ECTS', value: row.ects ? row.ects + ' ECTS' : '' }
               ];
 
               showDetailsOverlay(row.courseName, detailRows, components.length ? table : null);

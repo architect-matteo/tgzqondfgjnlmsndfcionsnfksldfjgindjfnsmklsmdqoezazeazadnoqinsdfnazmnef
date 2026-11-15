@@ -431,6 +431,33 @@ main.wide {
   }
 }
 
+@media (max-width: 600px) {
+  :root {
+    --base-size: 16px;
+  }
+
+  header.top {
+    padding: 0.9em 0.8em;
+  }
+
+  header.top h1 {
+    font-size: 1.2em;
+  }
+
+  main {
+    padding: 0.8em;
+  }
+
+  .filter-row {
+    gap: 0.6em;
+  }
+
+  .filter-group select {
+    padding: 0.75em 0.55em;
+    font-size: 0.95em;
+  }
+}
+
 #week-label {
   font-weight: 700;
   color: var(--vub-blue);
