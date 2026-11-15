@@ -283,7 +283,7 @@ function loadResultsList(jsonUrl, containerId) {
               var period = [row.semester, row.year].filter(Boolean).join(' ');
               var detailRows = [
                 { label: 'Eindscore', value: isNaN(score) ? '' : row.score + ' / 20' },
-                { label: 'Periode', value: row.semester + row.program },
+                { label: 'Periode', value: row.semester + ' ' + row.program },
                 { label: 'ECTS', value: row.ects ? row.ects + ' ECTS' : '' }
               ];
 
