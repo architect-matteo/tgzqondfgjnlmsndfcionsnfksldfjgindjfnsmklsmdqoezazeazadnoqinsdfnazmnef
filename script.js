@@ -111,7 +111,7 @@ function showDetailsOverlay(titleText, detailRows, extraContent) {
   return overlay;
 }
 
-// Load results from a public JSON file, with a click-to-expand breakdown per course.
+// Load results from Google Apps Script JSONP, with a click-to-expand breakdown per course.
 function loadResultsList(jsonUrl, containerId) {
   var container = document.getElementById(containerId);
   var yearSelect = document.getElementById('year-filter');
@@ -126,12 +126,33 @@ function loadResultsList(jsonUrl, containerId) {
     container.appendChild(messageElement);
   }
 
-  fetch(jsonUrl, { cache: 'no-store' })
-    .then(function (response) {
-      if (!response.ok) throw new Error('JSON niet gevonden (HTTP ' + response.status + ').');
-      return response.json();
-    })
-    .then(function (rows) {
+  function showError(error) {
+    console.error('Resultaten konden niet worden geladen:', error);
+    showMessage('Kon gegevens niet laden: ' + error.message);
+    var badge = document.getElementById('avg-score');
+    if (badge) badge.textContent = 'gem. -- /20';
+  }
+
+  if (jsonUrl.indexOf('PASTE_DEPLOYMENT_ID') !== -1 ||
+      !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec\/?$/.test(jsonUrl)) {
+    showError(new Error('Stel eerst de URL van de gedeployde Apps Script-webapp in.'));
+    return;
+  }
+
+  var callbackName = '__resultsJsonp' + Date.now() + Math.floor(Math.random() * 1000000);
+  var script = document.createElement('script');
+  var timeout;
+
+  function cleanup() {
+    clearTimeout(timeout);
+    delete window[callbackName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+  }
+
+  window[callbackName] = function (rows) {
+    cleanup();
+    try {
+      if (rows && rows.error) throw new Error(rows.error);
       if (!Array.isArray(rows)) throw new Error('De JSON moet een lijst van vakken bevatten.');
       if (rows.length === 0) {
         showMessage('Nog geen gegevens.');
@@ -309,13 +330,22 @@ function loadResultsList(jsonUrl, containerId) {
       semesterSelect.addEventListener('change', applyFilters);
 
       applyFilters();
-    })
-    .catch(function (error) {
-      console.error('Resultaten konden niet worden geladen:', error);
-      showMessage('Kon gegevens niet laden: ' + error.message);
-      var badge = document.getElementById('avg-score');
-      if (badge) badge.textContent = 'gem. -- /20';
-    });
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  script.onerror = function () {
+    cleanup();
+    showError(new Error('De Apps Script-webapp kon niet worden bereikt.'));
+  };
+
+  timeout = setTimeout(function () {
+    cleanup();
+    showError(new Error('De Apps Script-webapp reageerde niet op tijd.'));
+  }, 15000);
+  script.src = jsonUrl + (jsonUrl.indexOf('?') === -1 ? '?' : '&') + 'callback=' + encodeURIComponent(callbackName);
+  document.head.appendChild(script);
 }
 
 // Simple live search/filter for course or entry lists
