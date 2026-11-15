@@ -1,0 +1,266 @@
+
+
+// Build a small horizontal bar showing grade out of 20, color-coded.
+// grade: number (0-20). Returns a DOM element.
+function buildGradeBar(grade) {
+  var track = document.createElement('div');
+  track.className = 'grade-bar-track';
+
+  var fill = document.createElement('div');
+  fill.className = 'grade-bar-fill';
+
+  var numGrade = parseFloat(grade);
+  if (isNaN(numGrade)) numGrade = 0;
+
+  var percent = Math.max(0, Math.min(100, (numGrade / 20) * 100));
+  fill.style.width = percent + '%';
+
+  var colorClass;
+  if (numGrade < 10) {
+    colorClass = 'grade-bar-fail';
+  } else if (numGrade < 12) {
+    colorClass = 'grade-bar-low';
+  } else if (numGrade < 14) {
+    colorClass = 'grade-bar-mid';
+  } else if (numGrade < 16) {
+    colorClass = 'grade-bar-good';
+  } else {
+    colorClass = 'grade-bar-great';
+  }
+  fill.classList.add(colorClass);
+
+  track.appendChild(fill);
+  return track;
+}
+
+
+function parseResultsNumber(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return NaN;
+  return parseFloat(String(value).replace(',', '.'));
+}
+
+// Load results from a public JSON file, with a click-to-expand breakdown per course.
+function loadResultsList(jsonUrl, containerId) {
+  var container = document.getElementById(containerId);
+  var yearSelect = document.getElementById('year-filter');
+  var semesterSelect = document.getElementById('semester-filter');
+  if (!container || !yearSelect || !semesterSelect) return;
+
+  function showMessage(message) {
+    var messageElement = document.createElement('div');
+    messageElement.className = 'empty-msg';
+    messageElement.textContent = message;
+    container.innerHTML = '';
+    container.appendChild(messageElement);
+  }
+
+  fetch(jsonUrl, { cache: 'no-store' })
+    .then(function (response) {
+      if (!response.ok) throw new Error('JSON niet gevonden (HTTP ' + response.status + ').');
+      return response.json();
+    })
+    .then(function (rows) {
+      if (!Array.isArray(rows)) throw new Error('De JSON moet een lijst van vakken bevatten.');
+      if (rows.length === 0) {
+        showMessage('Nog geen gegevens.');
+        return;
+      }
+
+      rows.forEach(function (row, index) {
+        if (!row || typeof row.courseName !== 'string' || !row.courseName.trim()) {
+          throw new Error('Vak op positie ' + (index + 1) + ' mist courseName.');
+        }
+        if (row.partials !== undefined && !Array.isArray(row.partials)) {
+          throw new Error('De partials van "' + row.courseName + '" moeten een lijst zijn.');
+        }
+      });
+
+      var years = [];
+      var semesters = [];
+      rows.forEach(function (row) {
+        if (row.year && years.indexOf(row.year) === -1) years.push(row.year);
+        if (row.semester && semesters.indexOf(row.semester) === -1) semesters.push(row.semester);
+      });
+      years.sort();
+      semesters.sort();
+
+      function setOptions(select, values, label) {
+        select.innerHTML = '';
+        var emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = label;
+        select.appendChild(emptyOption);
+        values.forEach(function (value) {
+          var option = document.createElement('option');
+          option.value = value;
+          option.textContent = value;
+          select.appendChild(option);
+        });
+      }
+
+      setOptions(yearSelect, years, 'Alle jaren');
+      setOptions(semesterSelect, semesters, 'Alle semesters');
+
+      function filterRows() {
+        var yearValue = yearSelect.value;
+        var semesterValue = semesterSelect.value;
+        return rows.filter(function (row) {
+          if (yearValue && row.year !== yearValue) return false;
+          if (semesterValue && row.semester !== semesterValue) return false;
+          return true;
+        });
+      }
+
+      function renderRows(filteredRows) {
+        container.innerHTML = '';
+        if (filteredRows.length === 0) {
+          showMessage('Nog geen resultaten voor deze selectie.');
+          return;
+        }
+
+        filteredRows.forEach(function (row) {
+          var card = document.createElement('div');
+          card.className = 'entry-card score-item';
+
+          var title = document.createElement('div');
+          title.className = 'title';
+          title.textContent = row.courseName;
+
+          var meta = document.createElement('div');
+          meta.className = 'meta';
+          var score = parseResultsNumber(row.score);
+          var metaText = 'Score: ' + (isNaN(score) ? '\u2014' : row.score + ' / 20');
+          if (row.ects) metaText += ' \u00b7 ' + row.ects + ' ECTS';
+          if (row.program) metaText += ' \u00b7 ' + row.program;
+          if (row.semester) metaText += ' \u00b7 ' + row.semester;
+          if (row.year) metaText += ' \u00b7 ' + row.year;
+          meta.textContent = metaText;
+
+          card.appendChild(title);
+          card.appendChild(meta);
+          if (!isNaN(score)) card.appendChild(buildGradeBar(score));
+
+          var components = row.partials || [];
+          if (components.length > 0 || row.professor || row.description) {
+            card.classList.add('has-breakdown');
+            card.tabIndex = 0;
+            card.setAttribute('role', 'button');
+
+            var hint = document.createElement('div');
+            hint.className = 'breakdown-hint';
+            hint.textContent = 'Tik voor detail van deelscores';
+            card.appendChild(hint);
+
+            function openBreakdown() {
+              var table = document.createElement('div');
+              table.className = 'breakdown-table';
+
+              components.forEach(function (c) {
+                var rowEl = document.createElement('div');
+                rowEl.className = 'breakdown-row';
+
+                var nameEl = document.createElement('span');
+                nameEl.className = 'breakdown-component';
+                nameEl.textContent = c.name || '';
+                rowEl.appendChild(nameEl);
+
+                var gradeEl = document.createElement('span');
+                gradeEl.className = 'breakdown-grade';
+                var partialScore = parseResultsNumber(c.score);
+                var gradeText = isNaN(partialScore)
+                  ? 'Geen score'
+                  : (partialScore >= 0 && partialScore <= 1
+                    ? (partialScore * 100).toLocaleString('nl-BE') + '%'
+                    : c.score + ' / 20');
+                var weight = parseResultsNumber(c.weight);
+                if (!isNaN(weight)) {
+                  gradeText += ' (' + (weight <= 1 ? weight * 100 : weight).toLocaleString('nl-BE') + '%)';
+                }
+                gradeEl.textContent = gradeText;
+                rowEl.appendChild(gradeEl);
+
+                table.appendChild(rowEl);
+                if (!isNaN(partialScore)) {
+                  table.appendChild(buildGradeBar(partialScore >= 0 && partialScore <= 1
+                    ? partialScore * 20
+                    : partialScore));
+                }
+              });
+
+              var detailRows = [
+                { label: 'Eindscore', value: isNaN(score) ? '' : row.score + ' / 20' },
+                { label: 'Jaar', value: row.year },
+                { label: 'Programma', value: row.program },
+                { label: 'Semester', value: row.semester },
+                { label: 'ECTS', value: row.ects ? row.ects + ' studiepunten' : '' },
+                { label: 'Professor', value: row.professor },
+                { label: 'Beschrijving', value: row.description }
+              ];
+
+              showDetailsOverlay(row.courseName, detailRows, components.length ? table : null);
+            }
+
+            card.addEventListener('click', openBreakdown);
+            card.addEventListener('keydown', function (e) {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openBreakdown();
+              }
+            });
+          }
+
+          container.appendChild(card);
+        });
+      }
+
+      function applyFilters() {
+        var filteredRows = filterRows();
+        renderRows(filteredRows);
+        var total = 0;
+        var weight = 0;
+        filteredRows.forEach(function (row) {
+          var courseScore = parseResultsNumber(row.score);
+          var ects = parseResultsNumber(row.ects);
+          if (isNaN(courseScore) || isNaN(ects) || ects <= 0) return;
+          total += courseScore * ects;
+          weight += ects;
+        });
+        var badge = document.getElementById('avg-score');
+        if (badge) badge.textContent = 'gem. ' + (weight ? (total / weight).toFixed(1) : '--') + ' /20';
+        var input = document.getElementById('score-search');
+        if (input && input.value.trim() !== '') {
+          input.dispatchEvent(new Event('input'));
+        }
+      }
+
+      yearSelect.addEventListener('change', applyFilters);
+      semesterSelect.addEventListener('change', applyFilters);
+
+      applyFilters();
+    })
+    .catch(function (error) {
+      console.error('Resultaten konden niet worden geladen:', error);
+      showMessage('Kon gegevens niet laden: ' + error.message);
+      var badge = document.getElementById('avg-score');
+      if (badge) badge.textContent = 'gem. -- /20';
+    });
+}
+
+// Simple live search/filter for course or entry lists
+function setupSearch(inputId, itemSelector, emptyMsgId) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  input.addEventListener('input', function () {
+    var query = input.value.trim().toLowerCase();
+    var items = document.querySelectorAll(itemSelector);
+    var visibleCount = 0;
+    items.forEach(function (item) {
+      var text = item.textContent.toLowerCase();
+      var match = text.indexOf(query) !== -1;
+      item.style.display = match ? '' : 'none';
+      if (match) visibleCount++;
+    });
+    var emptyMsg = document.getElementById(emptyMsgId);
+    if (emptyMsg) emptyMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+  });
+}
